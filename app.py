@@ -1,42 +1,81 @@
-from flask import Flask, flash, render_template, request, redirect
+from flask import Flask, flash, render_template, request, redirect, session, url_for
 from flask_login import login_user, LoginManager
+from wtforms import StringField, PasswordField, SubmitField
+from wtforms.validators import Required
 from werkzeug.security import generate_password_hash, check_password_hash
 import pymysql
 from tables import Results
 from flaskext.mysql import MySQL
-from flask_wtf import FlaskForm
+from flask_wtf import Form
 from wtforms import StringField, PasswordField, SubmitField
+from passlib.hash import sha256_crypt
 
 
 app = Flask(__name__)
-app.config.from_pyfile('vars.cfg')
-
 mysql = MySQL()
-
-# MySQL configurations
 app.config.from_pyfile('vars.cfg')
-
-
-login_manager = LoginManager()
-login_manager.init_app(app)
-
 mysql.init_app(app)
 
 
-class LoginForm(FlaskForm):
-    username = StringField('Username')
-    password = PasswordField('Password')
-    submit = SubmitField('Submit')
+user_list = {
+    "user1": "password1",
+    "user2": "password2"
+}
 
 
-@app.route('/', methods=['GET'])
+@app.route('/', methods=['GET', 'POST'])
 def main_page():
+    if request.method == 'POST':
+        username = request.form['username']
+        password_candidate = request.form['password']
+
+        if username in user_list.keys():
+            print(user_list[username])
+            password = user_list[username]
+            if password_candidate == password:
+                session['logged_in'] = True
+                session['username'] = username
+                flash('You are now logged in', 'success')
+                return redirect(url_for('dashboard'))
+            else:
+                wr_pass = 'Wrong password'
+                return render_template('login.html', wr_pass=wr_pass)
+        else:
+            error = 'Invalid login'
+            print("WRONG")
+            return render_template('login.html', error=error)
     return render_template('login.html')
+
+
+        # if username in users.keys():
+        #     print(users)
+
+    #     if answer:
+    #         password = res['password']
+    #         if sha256_crypt.verify(password_candidate, password):
+    #             session['logged_in'] = True
+    #             session['username'] = username
+    #             flash('You are now logged in', 'success')
+    #             return redirect(url_for('dashboard'))
+    #             # return render_template('login.html', msg="Success")
+    #         else:
+    #             error = 'Invalid login'
+    #             return render_template('login.html', error=error)
+    #         cur.close()
+    #     else:
+    #         error = 'Username not found'
+    #         return render_template('login.html', error=error)
+
 
 
 @app.route('/new_user')
 def add_user_view():
     return render_template('add.html')
+
+
+@app.route('/dashboard')
+def dashboard():
+    return render_template('dashboard.html')
 
 
 @app.route('/add', methods=['POST'])
