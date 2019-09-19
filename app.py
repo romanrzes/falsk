@@ -1,4 +1,4 @@
-from flask import Flask, flash, render_template, request, redirect, session, url_for
+from flask import Flask, flash, render_template, request, redirect, session, url_for, g
 from flask_login import login_user, LoginManager
 from wtforms import StringField, PasswordField, SubmitField
 from wtforms.validators import Required
@@ -6,16 +6,17 @@ from werkzeug.security import generate_password_hash, check_password_hash
 import pymysql
 from tables import Results
 from flaskext.mysql import MySQL
-from flask_wtf import Form
-from wtforms import StringField, PasswordField, SubmitField
+from flask_wtf import FlaskForm
+from wtforms import StringField, PasswordField, SubmitField, validators, Form
 from passlib.hash import sha256_crypt
-
+import sqlite3
 
 app = Flask(__name__)
 mysql = MySQL()
 app.config.from_pyfile('vars.cfg')
 mysql.init_app(app)
 
+DATABASE = 'db.sqlite3'
 
 user_list = {
     "user1": "password1",
@@ -46,9 +47,8 @@ def main_page():
             return render_template('login.html', error=error)
     return render_template('login.html')
 
-
-        # if username in users.keys():
-        #     print(users)
+    # if username in users.keys():
+    #     print(users)
 
     #     if answer:
     #         password = res['password']
@@ -67,6 +67,38 @@ def main_page():
     #         return render_template('login.html', error=error)
 
 
+class RegisterForm(Form):
+    username = StringField('Username', [validators.length(min=1, max=50)])
+    password = PasswordField('New Password', [
+        validators.Required(),
+        validators.EqualTo('confirm', message='Passwords must match')
+    ])
+    confirm = PasswordField('Repeat Password')
+
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    forma = RegisterForm(request.form)
+    if request.method == 'POST' and forma.validate():
+        username = forma.username.data
+        password = sha256_crypt.encrypt(str(forma.password.data))
+        conn = sqlite3.connect(DATABASE)
+        cur = conn.cursor()
+        query = f"INSERT INTO admins(username, password) VALUES ('{username}', '{password}')"
+        cur.execute(query)
+        conn.commit()
+        cur.close()
+        flash("You are registered", 'success')
+        return redirect((url_for('dashboard')))
+    return render_template('register.html', form=forma)
+
+
+@app.route('/logout')
+def logout():
+    session.pop('username', None)
+    flash('You are now logged out', 'logout')
+    return redirect(url_for('main_page'))
+
 
 @app.route('/new_user')
 def add_user_view():
@@ -84,7 +116,7 @@ def add_user():
         _name = request.form['inputName']
         _email = request.form['inputEmail']
         _password = request.form['inputPassword']
-    # validate the received values
+        # validate the received values
         if _name and _email and _password and request.method == 'POST':
             # do not save password as a plain text
             _hashed_password = generate_password_hash(_password)
