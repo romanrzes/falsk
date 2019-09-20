@@ -14,10 +14,16 @@ mysql.init_app(app)
 
 DATABASE = 'db.sqlite3'
 
-user_list = {
-    "user1": "password1",
-    "user2": "password2"
-}
+table_name1 = 'admins'
+table_name2 = 'users'
+connection = sqlite3.connect(DATABASE)
+cur = connection.cursor()
+sql1 = "CREATE table if not exists " + table_name1 + "('username', 'password')"
+sql2 = "CREATE table if not exists " + table_name2 + "('user_name', 'user_email', 'user_password')"
+cur.execute(sql1)
+cur.execute(sql2)
+connection.commit()
+cur.close()
 
 
 @app.route('/', methods=['GET', 'POST'])
@@ -75,7 +81,7 @@ def register():
 
 @app.route('/logout')
 def logout():
-    session.pop('username', None)
+    session.clear()
     flash('You are now logged out', 'logout')
     return redirect(url_for('main_page'))
 
@@ -87,7 +93,10 @@ def add_user_view():
 
 @app.route('/dashboard')
 def dashboard():
-    return render_template('dashboard.html')
+    if session:
+        return render_template('dashboard.html')
+    else:
+        return redirect(url_for('main_page'))
 
 
 @app.route('/add', methods=['POST'])
